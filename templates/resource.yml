@@ -42,7 +42,7 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: IAMOneTimePassword
-      Description:  Auto-generated temporary password shared by all IAM users on first login. Each user is forced to change it immediately after sign-in.
+      Description: Auto-generated temporary password shared by all IAM users on first login.
       GenerateSecretString:
         SecretStringTemplate: '{"username": "admin"}'
         GenerateStringKey: password
