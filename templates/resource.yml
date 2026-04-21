@@ -1,10 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: >
-  IAM stack - provisions a Secrets Manager one-time password, S3 and EC2
-  groups with least-privilege policies, and three IAM console users.
-  ec2-user2 carries a permissions boundary that blocks EC2 instance creation.
-  Compatible with CloudFormation GitSync (git-sync deployment).
+Description: IAM stack - provisions a Secrets Manager one-time password, S3 and EC2 groups with least-privilege policies, and three IAM console users. ec2-user2 carries a permissions boundary that blocks EC2 instance creation.Compatible with CloudFormation GitSync (git-sync deployment).
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -32,9 +28,7 @@ Parameters:
   Ec2User2Name:
     Type: String
     Default: ec2-user2
-    Description: >
-      IAM username for the second EC2 user. Assigned to the EC2 group but
-      restricted by a permissions boundary that denies RunInstances.
+    Description: IAM username for the second EC2 user. Assigned to the EC2 group but restricted by a permissions boundary that denies RunInstances.
 
   S3UserName:
     Type: String
@@ -48,9 +42,7 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: IAMOneTimePassword
-      Description: >
-        Auto-generated temporary password shared by all IAM users on first
-        login. Each user is forced to change it immediately after sign-in.
+      Description:  Auto-generated temporary password shared by all IAM users on first login. Each user is forced to change it immediately after sign-in.
       GenerateSecretString:
         SecretStringTemplate: '{"username": "admin"}'
         GenerateStringKey: password
@@ -86,9 +78,7 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: EC2GroupAccessPolicy
-      Description: >
-        Grants read access to EC2 resources and the ability to launch
-        new instances. Attached to the EC2 group.
+      Description: Grants read access to EC2 resources and the ability to launch new instances. Attached to the EC2 group.
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -123,11 +113,7 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: EC2User2PermissionsBoundary
-      Description: >
-        Permissions boundary applied to ec2-user2. Allows all EC2 read and
-        management actions but explicitly denies RunInstances, preventing
-        the user from creating EC2 instances even if the group policy
-        would otherwise permit it.
+      Description: Permissions boundary applied to ec2-user2. Allows all EC2 read and management actions but explicitly denies RunInstances, preventing the user from creating EC2 instances even if the group policy would otherwise permit it.
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
