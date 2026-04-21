@@ -7,8 +7,10 @@ Resources:
   MyResource:
     Type: AWS::S3::Bucket
 
+
   MyResource2:
     Type: AWS::S3::Bucket
+
 
   MyResource3:
     Type: AWS::S3::Bucket
