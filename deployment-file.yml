@@ -1,0 +1,2 @@
+template-file-path: templates/resource.yml
+stack-name: cloud-deployment
