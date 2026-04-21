@@ -1,2 +1,9 @@
 template-file-path: templates/resource.yml
 stack-name: cloud-deployment
+parameters:
+  Ec2User1Name: ec2-user1
+  Ec2User2Name: ec2-user2
+  S3UserName:   s3-user
+
+tags:
+  ManagedBy:   CloudFormation-GitSync

@@ -1,16 +1,232 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
+Description: >
+  IAM stack - provisions a Secrets Manager one-time password, S3 and EC2
+  groups with least-privilege policies, and three IAM console users.
+  ec2-user2 carries a permissions boundary that blocks EC2 instance creation.
+  Compatible with CloudFormation GitSync (git-sync deployment).
 
-Description: 'CloudFormation template for a resource'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: User Names
+        Parameters:
+          - Ec2User1Name
+          - Ec2User2Name
+          - S3UserName
+    ParameterLabels:
+      Ec2User1Name:
+        default: EC2 User 1 username
+      Ec2User2Name:
+        default: EC2 User 2 username
+      S3UserName:
+        default: S3 User username
+
+Parameters:
+  Ec2User1Name:
+    Type: String
+    Default: ec2-user1
+    Description: IAM username for the first EC2 user (full EC2 group access).
+
+  Ec2User2Name:
+    Type: String
+    Default: ec2-user2
+    Description: >
+      IAM username for the second EC2 user. Assigned to the EC2 group but
+      restricted by a permissions boundary that denies RunInstances.
+
+  S3UserName:
+    Type: String
+    Default: s3-user
+    Description: IAM username for the S3 user (list buckets only).
+
 
 Resources:
-  MyResource:
-    Type: AWS::S3::Bucket
+
+  OneTimePassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: IAMOneTimePassword
+      Description: >
+        Auto-generated temporary password shared by all IAM users on first
+        login. Each user is forced to change it immediately after sign-in.
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: password
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+        RequireEachIncludedType: true
+
+  S3ReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: S3ListBucketsPolicy
+      Description: Allows listing all S3 buckets and resolving bucket locations.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowListBuckets
+            Effect: Allow
+            Action:
+              - s3:ListAllMyBuckets
+              - s3:GetBucketLocation
+            Resource: '*'
 
 
-  MyResource2:
-    Type: AWS::S3::Bucket
+  S3UserGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: S3UserGroup
+      ManagedPolicyArns:
+        - !Ref S3ReadPolicy
+        - arn:aws:iam::aws:policy/IAMUserChangePassword
+
+  EC2AccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: EC2GroupAccessPolicy
+      Description: >
+        Grants read access to EC2 resources and the ability to launch
+        new instances. Attached to the EC2 group.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowEC2Access
+            Effect: Allow
+            Action:
+              - ec2:DescribeInstances
+              - ec2:DescribeImages
+              - ec2:DescribeKeyPairs
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:DescribeVpcs
+              - ec2:DescribeAvailabilityZones
+              - ec2:RunInstances
+              - ec2:CreateTags
+              - ec2:CreateKeyPair
+              - ec2:CreateSecurityGroup
+              - ec2:AuthorizeSecurityGroupIngress
+            Resource: '*'
 
 
-  MyResource3:
-    Type: AWS::S3::Bucket
+  EC2UserGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: EC2UserGroup
+      ManagedPolicyArns:
+        - !Ref EC2AccessPolicy
+        - arn:aws:iam::aws:policy/IAMUserChangePassword
+
+
+  EC2User2PermissionsBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: EC2User2PermissionsBoundary
+      Description: >
+        Permissions boundary applied to ec2-user2. Allows all EC2 read and
+        management actions but explicitly denies RunInstances, preventing
+        the user from creating EC2 instances even if the group policy
+        would otherwise permit it.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowEC2ReadAndManage
+            Effect: Allow
+            Action:
+              - ec2:DescribeInstances
+              - ec2:DescribeImages
+              - ec2:DescribeKeyPairs
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:DescribeVpcs
+              - ec2:DescribeAvailabilityZones
+              - ec2:CreateTags
+              - ec2:CreateKeyPair
+              - ec2:CreateSecurityGroup
+              - ec2:AuthorizeSecurityGroupIngress
+            Resource: '*'
+          - Sid: AllowPasswordChange
+            Effect: Allow
+            Action:
+              - iam:ChangePassword
+              - iam:GetAccountPasswordPolicy
+            Resource: '*'
+          - Sid: DenyRunInstances
+            Effect: Deny
+            Action:
+              - ec2:RunInstances
+            Resource: '*'
+
+
+  EC2User1:
+    Type: AWS::IAM::User
+    DependsOn: OneTimePassword
+    Properties:
+      UserName: !Ref Ec2User1Name
+      Groups:
+        - !Ref EC2UserGroup
+      LoginProfile:
+        Password: !Sub '{{resolve:secretsmanager:IAMOneTimePassword:SecretString:password}}'
+        PasswordResetRequired: true
+
+  EC2User2:
+    Type: AWS::IAM::User
+    DependsOn: OneTimePassword
+    Properties:
+      UserName: !Ref Ec2User2Name
+      Groups:
+        - !Ref EC2UserGroup
+      LoginProfile:
+        Password: !Sub '{{resolve:secretsmanager:IAMOneTimePassword:SecretString:password}}'
+        PasswordResetRequired: true
+      PermissionsBoundary: !Ref EC2User2PermissionsBoundary
+
+  S3User:
+    Type: AWS::IAM::User
+    DependsOn: OneTimePassword
+    Properties:
+      UserName: !Ref S3UserName
+      Groups:
+        - !Ref S3UserGroup
+      LoginProfile:
+        Password: !Sub '{{resolve:secretsmanager:IAMOneTimePassword:SecretString:password}}'
+        PasswordResetRequired: true
+
+
+Outputs:
+  SecretArn:
+    Description: ARN of the Secrets Manager secret holding the one-time password.
+    Value: !Ref OneTimePassword
+    Export:
+      Name: !Sub '${AWS::StackName}-OneTimePasswordArn'
+
+  EC2User1Arn:
+    Description: ARN of ec2-user1.
+    Value: !GetAtt EC2User1.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2User1Arn'
+
+  EC2User2Arn:
+    Description: ARN of ec2-user2 (RunInstances denied via permissions boundary).
+    Value: !GetAtt EC2User2.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2User2Arn'
+
+  S3UserArn:
+    Description: ARN of s3-user.
+    Value: !GetAtt S3User.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-S3UserArn'
+
+  EC2UserGroupName:
+    Description: Name of the EC2 IAM user group.
+    Value: !Ref EC2UserGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2UserGroup'
+
+  S3UserGroupName:
+    Description: Name of the S3 IAM user group.
+    Value: !Ref S3UserGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-S3UserGroup'
