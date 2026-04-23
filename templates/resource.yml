@@ -11,12 +11,16 @@ Metadata:
           - Ec2User1Name
           - Ec2User2Name
           - S3UserName
+          - S3UserName2
     ParameterLabels:
       Ec2User1Name:
         default: EC2 User 1 username
       Ec2User2Name:
         default: EC2 User 2 username
       S3UserName:
+        default: S3 User username
+
+      S3UserName2:
         default: S3 User username
 
 Parameters:
@@ -33,6 +37,11 @@ Parameters:
   S3UserName:
     Type: String
     Default: s3-user
+    Description: IAM username for the S3 user (list buckets only).
+
+  S3UserName2:
+    Type: String
+    Default: s3-user-2
     Description: IAM username for the S3 user (list buckets only).
 
 
@@ -173,6 +182,17 @@ Resources:
     DependsOn: OneTimePassword
     Properties:
       UserName: !Ref S3UserName
+      Groups:
+        - !Ref S3UserGroup
+      LoginProfile:
+        Password: !Sub '{{resolve:secretsmanager:IAMOneTimePassword:SecretString:password}}'
+        PasswordResetRequired: true
+
+S3User2:
+    Type: AWS::IAM::User
+    DependsOn: OneTimePassword
+    Properties:
+      UserName: !Ref S3UserName2
       Groups:
         - !Ref S3UserGroup
       LoginProfile:
