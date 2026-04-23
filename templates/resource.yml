@@ -188,16 +188,16 @@ Resources:
         Password: !Sub '{{resolve:secretsmanager:IAMOneTimePassword:SecretString:password}}'
         PasswordResetRequired: true
 
-S3User2:
-    Type: AWS::IAM::User
-    DependsOn: OneTimePassword
-    Properties:
-      UserName: !Ref S3UserName2
-      Groups:
-        - !Ref S3UserGroup
-      LoginProfile:
-        Password: !Sub '{{resolve:secretsmanager:IAMOneTimePassword:SecretString:password}}'
-        PasswordResetRequired: true
+  S3User2:
+      Type: AWS::IAM::User
+      DependsOn: OneTimePassword
+      Properties:
+        UserName: !Ref S3UserName2
+        Groups:
+          - !Ref S3UserGroup
+        LoginProfile:
+          Password: !Sub '{{resolve:secretsmanager:IAMOneTimePassword:SecretString:password}}'
+          PasswordResetRequired: true
 
 
 Outputs:
